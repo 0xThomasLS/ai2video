@@ -1,0 +1,18 @@
+{
+  "name": "openai2video",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Generate video from OpenAI tools",
+  "main": "index.js",
+  "repository": "https://github.com/0xThomasLS/openai2video",
+  "author": "Thomas Le Sciellour <thomas.lesciellour@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "audioconcat": "^0.1.4",
+    "dotenv": "^16.3.1",
+    "fluent-ffmpeg": "^2.1.2",
+    "get-mp3-duration": "^1.0.0",
+    "openai": "^4.24.7",
+    "videoshow": "^0.1.12"
+  }
+}
