@@ -102,7 +102,8 @@ class OpenAI2Video {
       this.outputs.story = await this.callOpenAIChatAPI(this.inputs.search)
     }
 
-    if (outputPath) {
+    if (true === outputPath) console.log(this.outputs.story)
+    else if (outputPath) {
       fs.writeFileSync(outputPath, JSON.stringify(this.outputs.story), { encoding: 'utf8'})
       console.log('Story saved into: ' + outputPath)
     }

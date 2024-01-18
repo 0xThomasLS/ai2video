@@ -5,8 +5,19 @@ main()
 
 async function main() {
     const maker = new OpenAI2Video({
-        openAIApiKey: process.env.OPEN_AI_API_KEY,
-        aspect: 'vertical'
+      openAIApiKey: process.env.OPEN_AI_API_KEY,
+      mistralApiKey: process.env.MISTRAL_API_KEY,
+      aspect: 'vertical',
+      intermadiateFolder: './tmp',
+      voice: 'onyx',
+      models: {
+        chat: 'mistral-medium',
+        image: 'dall-e-3',
+        audio: 'tts-1'
+      },
+      image: {
+        style: 'vivid'
+      }
     })
 
     const storyName = 'short-etienne-story-fr'

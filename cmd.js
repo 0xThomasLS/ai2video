@@ -19,6 +19,8 @@ class StopExecution {
 }
 
 async function main() {
+  console.time('main')
+
   try {
     // Initialize
     const args = parseArgv()
@@ -74,6 +76,8 @@ async function main() {
       console.error(e)
     }
   }
+
+  console.timeEnd('main')
 }
 
 function parseArgv() {
