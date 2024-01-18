@@ -8,10 +8,12 @@
   "author": "Thomas Le Sciellour <thomas.lesciellour@gmail.com>",
   "license": "MIT",
   "dependencies": {
+    "@mistralai/mistralai": "^0.0.10",
     "audioconcat": "^0.1.4",
     "dotenv": "^16.3.1",
     "fluent-ffmpeg": "^2.1.2",
     "get-mp3-duration": "^1.0.0",
+    "node-fetch": "^3.3.2",
     "openai": "^4.24.7",
     "videoshow": "^0.1.12"
   }

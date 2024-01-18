@@ -1,10 +1,10 @@
 import OpenAI2VideoError from "./OpenAI2VideoError.js"
+import AI from "./ai/AI.js"
 
 import fs from "fs"
 import https from "https"
 import path from "path"
 
-import OpenAI from "openai"
 import getMP3Duration from "get-mp3-duration"
 import audioconcat from "audioconcat"
 import ffmpeg from "fluent-ffmpeg"
@@ -14,7 +14,7 @@ import videoshow from "videoshow"
 const DEFAULT_OPTIONS = {
   VIDEO_ASPECT: 'square',
   RETRY: 3,
-  TEMPORARY_FOLDER: './tmp',
+  INTERMADIATE_FOLDER: './tmp',
   CHAT_MODEL: 'gpt-4',
   IMAGE_MODEL: 'dall-e-3',
   AUDIO_MODEL: 'tts-1',
@@ -27,29 +27,19 @@ class OpenAI2Video {
   constructor(opts) {
     this.inputs = {}
     this.outputs = {}
-
-    const openAiOpts = {}
-
-    if (!opts.openAIApiKey) {
-      throw new OpenAI2VideoError({
-        status: 0,
-        message: 'OpenAI API key is mandatory'
-      })
-    }
-    openAiOpts.apiKey = opts.openAIApiKey
-
     this.global = {
-      openai: new OpenAI(openAiOpts),
+      ai: new AI({
+        openAIApiKey: opts.openAIApiKey,
+        mistralApiKey: opts.mistralApiKey,
+        textModel: opts.models && opts.models.chat ? opts.models.chat : DEFAULT_OPTIONS.CHAT_MODEL,
+        imageModel: opts.models && opts.models.image ? opts.models.image : DEFAULT_OPTIONS.IMAGE_MODEL,
+        audioModel: opts.models && opts.models.audio ? opts.models.audio : DEFAULT_OPTIONS.AUDIO_MODEL
+      }),
       aspect: opts.aspect ? opts.aspect : DEFAULT_OPTIONS.VIDEO_ASPECT,
       retry: opts.retry ? opts.retry : DEFAULT_OPTIONS.RETRY,
-      temporaryFolder: opts.temporaryFolder ? opts.temporaryFolder : DEFAULT_OPTIONS.TEMPORARY_FOLDER,
+      intermadiateFolder: opts.intermadiateFolder ? opts.intermadiateFolder : DEFAULT_OPTIONS.INTERMADIATE_FOLDER,
       backgroundMusic: opts.backgroundMusic,
       backgroundMusicVolume: opts.backgroundMusicVolume ? opts.backgroundMusicVolume : DEFAULT_OPTIONS.BACKGROUND_MUSIC_VOLUME,
-      models: {
-        chat: opts.models && opts.models.chat ? opts.models.chat : DEFAULT_OPTIONS.CHAT_MODEL,
-        image: opts.models && opts.models.image ? opts.models.image : DEFAULT_OPTIONS.IMAGE_MODEL,
-        audio: opts.models && opts.models.audio ? opts.models.audio : DEFAULT_OPTIONS.AUDIO_MODEL,
-      },
       image: {
         style: opts.image && opts.image.style ? opts.image.style : DEFAULT_OPTIONS.IMAGE_STYLE
       },
@@ -64,16 +54,15 @@ class OpenAI2Video {
 
     if (!this.global.video.width) {
       this.global.video.width = 1024
-      if (this.global.models.image === 'dall-e-3' && this.global.aspect === 'horizontal') this.global.video.width = 1792
+      if (this.global.ai.opts.models.image === 'dall-e-3' && this.global.aspect === 'horizontal') this.global.video.width = 1792
     }
     if (!this.global.video.height) {
       this.global.video.height = 1024
-      if (this.global.models.image === 'dall-e-3' && this.global.aspect === 'vertical') this.global.video.height = 1792
+      if (this.global.ai.opts.models.image === 'dall-e-3' && this.global.aspect === 'vertical') this.global.video.height = 1792
     }
   }
 
   fromSearch(prompt) {
-    console.log('Search...')
     this.inputs.search = prompt
     return this
   }
@@ -105,12 +94,17 @@ class OpenAI2Video {
     return this.fromHighlights(JSON.parse(highlights))
   }
 
-  async toStory() {
+  async toStory(outputPath) {
     console.log('Generate story...')
     if (!this.inputs) throw new OpenAI2VideoError(0, 'No inputs')
     
     if (this.inputs.search && !this.inputs.story) {
       this.outputs.story = await this.callOpenAIChatAPI(this.inputs.search)
+    }
+
+    if (outputPath) {
+      fs.writeFileSync(outputPath, JSON.stringify(this.outputs.story), { encoding: 'utf8'})
+      console.log('Story saved into: ' + outputPath)
     }
 
     return this.outputs
@@ -124,6 +118,7 @@ class OpenAI2Video {
 
     if (outputPath) {
       fs.writeFileSync(outputPath, JSON.stringify(this.outputs.highlights), { encoding: 'utf8'})
+      console.log('Highlights description saved into: ' + outputPath)
     }
 
     return this.outputs
@@ -152,6 +147,7 @@ class OpenAI2Video {
 
     if (outputPath) {
       fs.writeFileSync(outputPath, JSON.stringify(this.outputs.images), { encoding: 'utf8'})
+      console.log('Images description saved into: ' + outputPath)
     }
 
     return this.outputs
@@ -187,6 +183,7 @@ class OpenAI2Video {
 
     if (outputDescPath) {
       fs.writeFileSync(outputDescPath, JSON.stringify(this.outputs.speechs), { encoding: 'utf8'})
+      console.log('Audios speechs description saved into: ' + outputPath)
     }
 
     console.log('Generate audio file...')
@@ -207,14 +204,14 @@ class OpenAI2Video {
     return this.outputs
   }
 
-  async toAudioAndVideo(audioPath, videoPath) {
+  async toAudioAndVideo(audioPath, videoPath, outputDescPath) {
     if (!this.outputs || !this.outputs.highlights) await this.toHighlights()
     if (!this.outputs || !this.outputs.images) await this.toImages()
-    if (!this.outputs || !this.outputs.speechs) await this.toAudio(audioPath)
+    if (!this.outputs || !this.outputs.speechs) await this.toAudio(audioPath, outputDescPath)
 
     // Generate video
     console.log('Generate video...')
-    const tmpVideoPath = this.global.temporaryFolder + '/video.mp4'
+    const tmpVideoPath = this.global.intermadiateFolder + '/video.mp4'
     await this.generateVideoFile(tmpVideoPath)
 
     // Merge audio and video
@@ -228,23 +225,12 @@ class OpenAI2Video {
   }
 
   async callOpenAIChatAPI(prompt) {
-    const result = await this.global.openai.chat.completions.create({
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        },
-      ],
-      model: this.global.models.chat
-    })
-  
-    return result.choices[0].message.content
+    return await this.global.ai.text({ prompt })
   }
 
   async callOpenAIImageAPI(id, prompt, retry=this.global.retry) {
     try {
-      const image = await this.global.openai.images.generate({
-        model: this.global.models.image,
+      const image = await this.global.ai.image({
         prompt: `Generate an image of "${prompt}" by complying content policy. Realistic photo, vertical format, portrait orientation, no text`,
         style: this.global.image.style,
         size: `${this.global.video.width}x${this.global.video.height}`,
@@ -252,12 +238,12 @@ class OpenAI2Video {
       })
     
       // Retrieve image and create temporary file
-      const imageBuffer = await createBufferFromUrl(image.data[0].url, this.global.retry)
-      const imagePath = path.resolve(`${this.global.temporaryFolder}/img${id}.png`)
+      const imageBuffer = await createBufferFromUrl(image.url, this.global.retry)
+      const imagePath = path.resolve(`${this.global.intermadiateFolder}/img${id}.png`)
       fs.writeFileSync(imagePath, imageBuffer)
 
       return {
-        url: image.data[0].url,
+        url: image.url,
         path: imagePath
       }
     } catch (e) {
@@ -270,15 +256,14 @@ class OpenAI2Video {
   }
 
   async callOpenAIAudioAPI(id, prompt) {
-    const mp3 = await this.global.openai.audio.speech.create({
-      model: this.global.models.audio,
+    const mp3 = await this.global.ai.audio({
       voice: this.global.audio.voice,
-      input: prompt,
+      prompt: prompt
     })
   
     // Retrieve and create speech mp3
     const buffer = Buffer.from(await mp3.arrayBuffer())
-    const speechPath = path.resolve(`${this.global.temporaryFolder}/speech${id}.mp3`)
+    const speechPath = path.resolve(`${this.global.intermadiateFolder}/speech${id}.mp3`)
     fs.writeFileSync(speechPath, buffer)
   
     return {
@@ -289,12 +274,12 @@ class OpenAI2Video {
 
   async generateAudioFile(outputPath) {
     console.log('Merge speechs...')
-    const speechAudioPath = this.global.temporaryFolder + '/speech.mp3'
+    const speechAudioPath = this.global.intermadiateFolder + '/speech.mp3'
     await concatAudioFile(this.outputs.speechs.map(speech => speech.path), speechAudioPath)
   
     if (this.global.backgroundMusic) {
       console.log('Merge audio speech and music files...')
-      const musicAudioPath = this.global.temporaryFolder + '/music.mp3'
+      const musicAudioPath = this.global.intermadiateFolder + '/music.mp3'
       await this.createBackgroundMusic(musicAudioPath)
       await mergeAudioFile(speechAudioPath, musicAudioPath, {
         audio1Volume: 1,
@@ -312,7 +297,7 @@ class OpenAI2Video {
     console.log('Generate background music...')
   
     // Get duration of speech audio
-    const buffer = fs.readFileSync(this.global.temporaryFolder + '/speech.mp3')
+    const buffer = fs.readFileSync(this.global.intermadiateFolder + '/speech.mp3')
     const speechDuration = getMP3Duration(buffer)
 
     const musicList = []

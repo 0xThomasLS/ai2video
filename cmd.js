@@ -20,12 +20,14 @@ class StopExecution {
 
 async function main() {
   try {
+    // Initialize
     const args = parseArgv()
-    const openAI2VideoOpts = {
-      openAIApiKey: args.apiKey,
+    const maker = new OpenAI2Video({
+      openAIApiKey: args.openAIApiKey,
+      mistralApiKey: args.mistralApiKey,
       aspect: args.aspect,
       retry: args.retry,
-      temporaryFolder: args.tmp,
+      intermadiateFolder: args.intermadiate,
       backgroundMusicVolume: args.backgroundMusicVolume,
       voice: args.voice,
       models: {
@@ -36,10 +38,7 @@ async function main() {
       image: {
         style: args.imageStyle
       }
-    }
-
-    // Initialize
-    const maker = new OpenAI2Video(openAI2VideoOpts)
+    })
 
     // Load input
     if (args.search)          maker.fromSearch(args.search)
@@ -58,11 +57,14 @@ async function main() {
     if (args.addSpeechsDesc)      maker.addSpeechsDescription(args.addSpeechsDesc)
     if (args.addSpeechsDescFile)  maker.addSpeechsDescriptionFile(args.addSpeechsDescFile)
 
-    // Generate
+    // Generate intermadiates files
+    if (args.outputStory)                     await maker.toStory(args.outputStory)
     if (args.outputHighlights)                await maker.toHighlights(args.outputHighlights)
     if (args.outputImages)                    await maker.toImages(args.outputImages)
-    if (args.outputAudio && args.outputVideo) await maker.toAudioAndVideo(args.outputAudio, args.outputVideo)
-    else if (args.outputAudio)                await maker.toAudio(args.outputAudio)
+
+    // Generate final files
+    if (args.outputAudio && args.outputVideo) await maker.toAudioAndVideo(args.outputAudio, args.outputVideo, args.outputAudioDescFile)
+    else if (args.outputAudio)                await maker.toAudio(args.outputAudio, args.outputAudioDescFile)
     else if (args.outputVideo)                await maker.toVideo(args.outputVideo)
 
     console.log('Finished!')
@@ -91,7 +93,8 @@ function parseArgv() {
 
   // Define default argument values
   const defaultArgs = {
-    apiKey: process.env.OPEN_AI_API_KEY
+    openAIApiKey: process.env.OPEN_AI_API_KEY,
+    mistralApiKey: process.env.MISTRAL_API_KEY
   }
 
   if (args.help) {
@@ -99,13 +102,15 @@ function parseArgv() {
     console.log("\nOptions:")
     console.log("\t--help\t\t\t\tOpen documentation for this node script")
     console.log("\t--apiKey=...\t\t\tOpenAI API key")
-    console.log(`\t--tmp=...\t\t\tTemporary folder for intermediate generation`)
+    console.log(`\t--intermadiate=...\t\t\Intermadiate folder for intermediate generation`)
     console.log(`\t--retry=...\t\t\tNumber of retry (default: ${DEFAULT_OPTIONS.RETRY}) when error occured`)
     console.log(`\t--aspect=...\t\t\tVideo aspect output (square, vertical, horizontal, default: ${DEFAULT_OPTIONS.VIDEO_ASPECT})`)
-    console.log("\t--outputHighlights=...\t\tHighlights output path")
-    console.log("\t--outputImages=...\t\tImages output path")
+    console.log("\t--outputStory=...\t\Story output path")
+    console.log("\t--outputHighlights=...\t\tHighlights description file path")
+    console.log("\t--outputImages=...\t\tImages description file path")
     console.log(`\t--outputVideo=...\t\tVideo output path (default: ${defaultArgs.outputVideo})`)
     console.log(`\t--outputAudio=...\t\tAudio output path (default: ${defaultArgs.outputAudio})`)
+    console.log("\t--outputAudioDescFile=...\t\tAudio description file path")
     console.log(`\t--chatModel=...\t\t\tOpenAI model (default: ${DEFAULT_OPTIONS.CHAT_MODEL}) used for chat (rewrite story, highlight...)`)
     console.log(`\t--imageModel=...\t\tOpenAI model (default: ${DEFAULT_OPTIONS.IMAGE_MODEL}) used for generate image`)
     console.log(`\t--imageStyle=...\t\tOpenAI style (default: ${DEFAULT_OPTIONS.IMAGE_STYLE}, only for dall-e-3 model) used for generate image`)
@@ -126,9 +131,8 @@ function parseArgv() {
     throw new StopExecution('help')
   }
 
-  if (!args.apiKey) {
-    args.apiKey = defaultArgs.apiKey
-  }
+  if (!args.openAIApiKey) args.openAIApiKey = defaultArgs.openAIApiKey
+  if (!args.mistralApiKey) args.mistralApiKey = defaultArgs.mistralApiKey
 
   return args
 }
