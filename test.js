@@ -1,4 +1,6 @@
 import { OpenAI2Video, OpenAI2VideoError } from "./index.js"
+import { createCanvas, loadImage, GlobalFonts } from "@napi-rs/canvas"
+import fs from "fs"
 import "dotenv/config"
 
 main()

@@ -1,9 +1,6 @@
 import { DEFAULT_OPTIONS, OpenAI2Video, OpenAI2VideoError } from "./index.js"
 import "dotenv/config"
 
-main()
-
-
 class StopExecution {
   constuctor(tag) {
     this.tag = tag
@@ -17,6 +14,9 @@ class StopExecution {
     console.error(`Stop execution due to '${this.tag}'`)
   }
 }
+
+main()
+
 
 async function main() {
   console.time('main')
@@ -49,6 +49,9 @@ async function main() {
     if (args.storyFile)       maker.fromStoryFile(args.storyFile)
     if (args.highlights)      maker.fromHighlights(args.highlights)
     if (args.highlightsFile)  maker.fromHighlightsFile(args.highlightsFile)
+
+    // Add title screen
+    if (args.titleScreen) maker.addTitleScreen(args.titleScreen)
 
     // Add background music
     if (args.backgroundMusic) maker.addBackgroundMusicList(args.backgroundMusic.substring(0, 1) === '[' ? JSON.parse(args.backgroundMusic) : [ args.backgroundMusic ])
@@ -106,15 +109,15 @@ function parseArgv() {
     console.log("\nOptions:")
     console.log("\t--help\t\t\t\tOpen documentation for this node script")
     console.log("\t--apiKey=...\t\t\tOpenAI API key")
-    console.log(`\t--intermadiate=...\t\t\Intermadiate folder for intermediate generation`)
+    console.log(`\t--intermadiate=...\t\t\Intermadiate folder for intermediate generation (default: ${DEFAULT_OPTIONS.INTERMADIATE_FOLDER})`)
     console.log(`\t--retry=...\t\t\tNumber of retry (default: ${DEFAULT_OPTIONS.RETRY}) when error occured`)
     console.log(`\t--aspect=...\t\t\tVideo aspect output (square, vertical, horizontal, default: ${DEFAULT_OPTIONS.VIDEO_ASPECT})`)
-    console.log("\t--outputStory=...\t\Story output path")
+    console.log("\t--outputStory=...\t\tStory output path")
     console.log("\t--outputHighlights=...\t\tHighlights description file path")
     console.log("\t--outputImages=...\t\tImages description file path")
     console.log(`\t--outputVideo=...\t\tVideo output path (default: ${defaultArgs.outputVideo})`)
     console.log(`\t--outputAudio=...\t\tAudio output path (default: ${defaultArgs.outputAudio})`)
-    console.log("\t--outputAudioDescFile=...\t\tAudio description file path")
+    console.log("\t--outputAudioDescFile=...\tAudio description file path")
     console.log(`\t--chatModel=...\t\t\tOpenAI model (default: ${DEFAULT_OPTIONS.CHAT_MODEL}) used for chat (rewrite story, highlight...)`)
     console.log(`\t--imageModel=...\t\tOpenAI model (default: ${DEFAULT_OPTIONS.IMAGE_MODEL}) used for generate image`)
     console.log(`\t--imageStyle=...\t\tOpenAI style (default: ${DEFAULT_OPTIONS.IMAGE_STYLE}, only for dall-e-3 model) used for generate image`)
@@ -131,7 +134,7 @@ function parseArgv() {
     console.log("\t--addImageDesc=...\t\tAdd image description")
     console.log("\t--addImageDescFile=...\t\tAdd image description file")
     console.log("\t--addSpeechsDesc=...\t\tAdd speechs description")
-    console.log("\t--addSpeechsDescFile=...\t\tAdd speechs description file")
+    console.log("\t--addSpeechsDescFile=...\tAdd speechs description file")
     throw new StopExecution('help')
   }
 

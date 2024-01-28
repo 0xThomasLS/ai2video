@@ -9,6 +9,7 @@ import getMP3Duration from "get-mp3-duration"
 import audioconcat from "audioconcat"
 import ffmpeg from "fluent-ffmpeg"
 import videoshow from "videoshow"
+import { createCanvas, loadImage, GlobalFonts } from "@napi-rs/canvas"
 
 
 const DEFAULT_OPTIONS = {
@@ -94,6 +95,12 @@ class OpenAI2Video {
     return this.fromHighlights(JSON.parse(highlights))
   }
 
+  addTitleScreen(title) {
+    this.global.title = {
+      text: title
+    }
+  }
+
   async toStory(outputPath) {
     console.log('Generate story...')
     if (!this.inputs) throw new OpenAI2VideoError(0, 'No inputs')
@@ -115,7 +122,21 @@ class OpenAI2Video {
     if (!this.outputs || !this.outputs.story) await this.toStory()
 
     console.log('Generate highlights...')
-    this.outputs.highlights = JSON.parse((await this.callOpenAIChatAPI(`Extrait les points d'intérêts (highlight) de l'histoire, ces points d'intérêts serviront à générer les illustrations pour créer les scènes vidéos, tu dois noter ces points d'intérêts au format JSON (tableau JSON) en respectant la structure suivante : \`\`\`{ "highlight": "Point d'intérêt de l'histoire", "prompt": "Prompt DALL-E"}\`\`\`. Le prompt (sans ponctuation) de génération d'image pour l'IA DALL-E, doit avoir le maximum de détail pour conserver les informations des personnages (genre, age...), des lieux... et la trame générale de l'histoire, les images doivent rester cohérente entre elles et doivent être écrite en anglais. Voici un exemple de ce qui est attendu comme objet représentant un point d'intérêt de l'histoire : \`\`\`{"highlight": "Je m'appelle Sarah et j'ai 25 ans. Mon histoire s'est déroulée un soir de juillet 2018, alors que je rentrais en vélo électrique de mon travail, à seulement quelques kilomètres de chez moi. En été, j'ai l'habitude de prendre mon vélo électrique, c'est plus sympa et plus écologique aussi.", "prompt": "Sarah 25 years old cycles home from work"}\`\`\`. A toi de réaliser ce découpage avec l'histoire : "${this.outputs.story}"`)).replace('`', ''))
+    const highlights = JSON.parse((await this.callOpenAIChatAPI(`Sans rien modifier à l'histoire, extrait les points d'intérêts (highlight) de l'histoire, ces points d'intérêts serviront à générer les illustrations pour créer les scènes vidéos, tu dois noter ces points d'intérêts au format JSON (tableau JSON) en respectant la structure suivante : \`\`\`{ "highlight": "Point d'intérêt de l'histoire", "prompt": "Prompt DALL-E"}\`\`\`. Le prompt (sans ponctuation) de génération d'image pour l'IA DALL-E, doit avoir le maximum de détail pour conserver les informations des personnages (genre, age...), des lieux... et la trame générale de l'histoire, les images doivent rester cohérente entre elles et doivent être écrite en anglais. Voici un exemple de ce qui est attendu comme objet représentant un point d'intérêt de l'histoire : \`\`\`{"highlight": "Je m'appelle Sarah et j'ai 25 ans. Mon histoire s'est déroulée un soir de juillet 2018, alors que je rentrais en vélo électrique de mon travail, à seulement quelques kilomètres de chez moi. En été, j'ai l'habitude de prendre mon vélo électrique, c'est plus sympa et plus écologique aussi.", "prompt": "Sarah 25 years old cycles home from work"}\`\`\`. A toi de réaliser ce découpage avec l'histoire : "${this.outputs.story}"`)).replace('`', ''))
+
+    if (this.global.title) {
+      highlights.unshift({ type: 'title', highlight: this.global.title.text })
+    }
+
+    this.outputs.highlights = highlights.map((highlight) => {
+      const item = highlight
+
+      if (!item.type) {
+        item.type = 'normal'
+      }
+
+      return item
+    })
 
     if (outputPath) {
       fs.writeFileSync(outputPath, JSON.stringify(this.outputs.highlights), { encoding: 'utf8'})
@@ -140,11 +161,35 @@ class OpenAI2Video {
     if (!this.outputs || !this.outputs.highlights) await this.toHighlights()
 
     console.log('Generate images...')
-    this.outputs.images = []
+    const images = []
     for (let i=0; i<this.outputs.highlights.length; i++) {
-      console.log(`Generate image for highlight (${(i+1)}/${this.outputs.highlights.length})...`)
-      this.outputs.images[i] = await this.callOpenAIImageAPI(i+1, this.outputs.highlights[i].prompt)
+      if (this.outputs.highlights[i].type === 'normal') {
+        console.log(`Generate image for highlight (${(i+1)}/${this.outputs.highlights.length})...`)
+        images[i] = await this.callOpenAIImageAPI(i+1, this.outputs.highlights[i].prompt)
+      }
     }
+
+    console.log('Generate title screen...')
+    if (this.global.title) {
+      const titleOutputPath = path.resolve(this.global.intermadiateFolder + '/title.jpg')
+
+      await generateTitleScreen({
+        text: this.global.title.text,
+        backgroundImage: images[1].path,
+        width: this.global.video.width,
+        height: this.global.video.height,
+        outputPath: titleOutputPath,
+        margin: 20,
+        font: {
+          size: 50,
+          family: 'Ubuntu'
+        }
+      })
+
+      images[0] = { path: titleOutputPath }
+    }
+
+    this.outputs.images = images
 
     if (outputPath) {
       fs.writeFileSync(outputPath, JSON.stringify(this.outputs.images), { encoding: 'utf8'})
@@ -178,7 +223,7 @@ class OpenAI2Video {
       this.outputs.speechs = []
       for (let i=0; i<this.outputs.highlights.length; i++) {
         console.log(`Generate speech for highlight (${(i+1)}/${this.outputs.highlights.length})...`)
-        this.outputs.speechs[i] = await this.callOpenAIAudioAPI(i+1, this.outputs.highlights[i].highlight)
+        this.outputs.speechs[i] = await this.callOpenAIAudioAPI(i+1, this.outputs.highlights[i].highlight + (this.outputs.highlights[i].type === 'title' ? '!' : ''))
       }
     }
 
@@ -321,18 +366,37 @@ class OpenAI2Video {
   }
 
   async generateVideoFile(output) {
+    const fps = 30
+    let filterInverted = false
+
     return new Promise((resolve, reject) => {
       videoshow(
         this.outputs.highlights.map(
-          (highlight, id) => ({
-            path: this.outputs.images[id].path,
-            caption: highlight.highlight,
-            captionStart: 100,
-            loop: this.outputs.speechs[id].duration / 1000
-          })
+          (highlight, id) => {
+            const image = {
+              path: this.outputs.images[id].path,
+              loop: this.outputs.speechs[id].duration / 1000
+            }
+            
+            if (highlight.type && highlight.type === 'normal') {
+              if (filterInverted) image.filters = "zoompan=z='1.5-on/duration*0.5'"
+              else image.filters = "zoompan=z='zoom+0.0015'"
+              image.filters += `:x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2):d=${fps}*${image.loop}:s=${this.global.video.width}x${this.global.video.height}:fps=${fps}`
+              filterInverted = !filterInverted
+
+              image.caption = highlight.highlight
+              image.captionStart = 100
+            }
+            
+            if (id === 0) {
+              image.transition = false
+            }
+            
+            return image
+          }
         ), 
         {
-          fps: 30,
+          fps: fps,
           captionDelay: 0,
           size: `${this.global.video.width}x${this.global.video.height}`,
           subtitleStyle: {
@@ -347,8 +411,8 @@ class OpenAI2Video {
         }
       )
         .save(output)
-        .on('error', function () {
-          reject()
+        .on('error', function (e) {
+          reject(e)
         })
         .on('end', function () {
           resolve()
@@ -444,10 +508,12 @@ async function mergeAudioFile(audio1, audio2, opts) {
 
 async function mergeAudioAndVideo(audio, video, output) {
   return new Promise((resolve, reject) => {
+    const ffmpegOpts = [ '-map 0:v', '-map 1:a', '-c:v copy', '-c:a aac', '-movflags faststart', '-vcodec mpeg4', '-strict', '-2' ]
+
     ffmpeg()
         .addInput(video)
         .addInput(audio)
-        .addOptions(['-map 0:v', '-map 1:a', '-c:v copy', '-c:a aac', '-movflags faststart', '-vcodec mpeg4', '-strict', '-2' ])
+        .addOptions(ffmpegOpts)
         .on('error', error => {
           reject(error)
         })
@@ -456,4 +522,134 @@ async function mergeAudioAndVideo(audio, video, output) {
         })
         .saveToFile(output)
   })
+}
+
+async function generateTitleScreen(opts) {
+  const canvas = createCanvas(opts.width, opts.height)
+  const ctx = canvas.getContext('2d')
+
+  if (opts.backgroundImage) {
+    const background = await loadImage(opts.backgroundImage)
+    ctx.drawImage(background, 0, 0, opts.width, opts.height)
+  }
+
+  if (opts.text) {
+    const lines = writeMultiLineCentered(ctx, {
+      text: opts.text,
+      font: {
+        size: opts.font.size,
+        family: opts.font.family
+      },
+      width: opts.width,
+      height: opts.height,
+      margin: opts.margin
+    })
+
+    // Generate Tiktok panel
+    templateTiktokPanel(ctx, opts, lines)
+
+    // Title
+    ctx.fillStyle = '#FFFFFF'
+    lines.draw()
+  }
+
+  // Write image
+  fs.writeFileSync(opts.outputPath, await canvas.encode('jpeg'))
+}
+
+function writeMultiLineCentered(ctx, opts) {
+  ctx.font = opts.font.size + 'px ' + opts.font.family
+
+  const maxWidth = opts.width - (2 * opts.margin)
+  const lines = splitText(ctx, opts.text, maxWidth)
+  const firstLineY = (opts.height - (lines.length * opts.font.size)) / 2
+
+  let maxLineWidth = ctx.measureText(lines[0]).width
+  for (let i=1; i<lines.length; i++) {
+    const actualLineWidth = ctx.measureText(lines[i]).width
+    if (actualLineWidth > maxLineWidth) {
+      maxLineWidth = actualLineWidth
+    }
+  }
+
+  return {
+    x: (opts.width - maxLineWidth) / 2,
+    y: firstLineY,
+    width: maxLineWidth,
+    height: lines.length * opts.font.size,
+    draw() {
+      ctx.font = opts.font.size + 'px ' + opts.font.family
+
+      lines.forEach((line, pos) => {
+        const size = ctx.measureText(line)
+
+        ctx.fillText(line, (opts.width - size.width) / 2, firstLineY + (opts.font.size * (pos+1)))
+      })
+    }
+  }
+}
+
+function splitText(ctx, text, maxWidth) {
+  const size = ctx.measureText(text)
+  const ratio = size.width / maxWidth
+
+  if (ratio <= 1) return [ text ]
+
+  const words = text.split(' ')
+  const lines = [ [] ]
+
+  let i = 0
+  while (words.length > 0) {
+    const newWord = words.shift()
+    if (ctx.measureText(lines[i].join(' ') + ' ' + newWord).width >= maxWidth) {
+      i++
+      lines[i] = []
+    }
+
+    lines[i].push(newWord)
+  }
+
+  return lines.map(line => line.join(' '))
+}
+
+function templateTiktokPanel(ctx, opts, lines) {
+  // Rectangle bleu
+  ctx.fillStyle = '#2AD2EA'
+  ctx.fillRect(lines.x-(2*opts.margin), lines.y-(2*opts.margin)+(opts.font.size/5), lines.width+(2*opts.margin), lines.height+(2*opts.margin))
+
+  // Triangle supérieur
+  ctx.beginPath()
+  ctx.moveTo(lines.x+lines.width-1, lines.y-(2*opts.margin)+(opts.font.size/5))
+  ctx.lineTo(lines.x+lines.width+opts.margin, lines.y-opts.margin+(opts.font.size/5))
+  ctx.lineTo(lines.x+lines.width-1, lines.y-opts.margin+(opts.font.size/5))
+  ctx.fill()
+
+  // Triangle inférieur
+  ctx.beginPath()
+  ctx.moveTo(lines.x-(2*opts.margin), lines.y+(opts.font.size/5)+lines.height)
+  ctx.lineTo(lines.x-opts.margin, lines.y+(opts.font.size/5)+lines.height)
+  ctx.lineTo(lines.x-opts.margin, lines.y+(opts.font.size/5)+lines.height+opts.margin)
+  ctx.fill()
+
+  // Rectangle rouge
+  ctx.fillStyle = '#F53159'
+  ctx.fillRect(lines.x, lines.y+(opts.font.size/5), lines.width+(2*opts.margin), lines.height+(2*opts.margin))
+
+  // Triangle supérieur
+  ctx.beginPath()
+  ctx.moveTo(lines.x+lines.width+opts.margin, lines.y-opts.margin+(opts.font.size/5))
+  ctx.lineTo(lines.x+lines.width+(2*opts.margin), lines.y+(opts.font.size/5))
+  ctx.lineTo(lines.x+lines.width+opts.margin, lines.y+(opts.font.size/5))
+  ctx.fill()
+
+  // Triangle inférieur
+  ctx.beginPath()
+  ctx.moveTo(lines.x-opts.margin, lines.y+(opts.font.size/5)+lines.height+opts.margin)
+  ctx.lineTo(lines.x, lines.y+(opts.font.size/5)+lines.height+opts.margin)
+  ctx.lineTo(lines.x, lines.y+(opts.font.size/5)+lines.height+(2*opts.margin))
+  ctx.fill()
+
+  // Rectangle noir central
+  ctx.fillStyle = '#000000'
+  ctx.fillRect(lines.x-opts.margin, lines.y-opts.margin+(opts.font.size/5), lines.width+(2*opts.margin), lines.height+(2*opts.margin))
 }

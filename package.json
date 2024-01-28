@@ -9,6 +9,7 @@
   "license": "MIT",
   "dependencies": {
     "@mistralai/mistralai": "^0.0.10",
+    "@napi-rs/canvas": "^0.1.44",
     "audioconcat": "^0.1.4",
     "dotenv": "^16.3.1",
     "fluent-ffmpeg": "^2.1.2",
