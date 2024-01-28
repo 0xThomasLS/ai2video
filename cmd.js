@@ -51,7 +51,11 @@ async function main() {
     if (args.highlightsFile)  maker.fromHighlightsFile(args.highlightsFile)
 
     // Add title screen
-    if (args.titleScreen) maker.addTitleScreen(args.titleScreen)
+    if (args.titleScreenText)         maker.addTitleScreenText(args.titleScreenText)
+    if (args.titleScreenBlur)         maker.addTitleScreenBlur(args.titleScreenBlur)
+    if (args.titleScreenMargin)       maker.addTitleScreenMargin(args.titleScreenMargin)
+    if (args.titleScreenFontSize)     maker.addTitleScreenFontSize(args.titleScreenFontSize)
+    if (args.titleScreenFontFamily)   maker.addTitleScreenFontFamily(args.titleScreenFontFamily)
 
     // Add background music
     if (args.backgroundMusic) maker.addBackgroundMusicList(args.backgroundMusic.substring(0, 1) === '[' ? JSON.parse(args.backgroundMusic) : [ args.backgroundMusic ])
@@ -63,9 +67,10 @@ async function main() {
     if (args.addSpeechsDescFile)  maker.addSpeechsDescriptionFile(args.addSpeechsDescFile)
 
     // Generate intermadiates files
-    if (args.outputStory)                     await maker.toStory(args.outputStory)
-    if (args.outputHighlights)                await maker.toHighlights(args.outputHighlights)
-    if (args.outputImages)                    await maker.toImages(args.outputImages)
+    if (args.outputStory)       await maker.toStory(args.outputStory)
+    if (args.outputHighlights)  await maker.toHighlights(args.outputHighlights)
+    if (args.translateHighlights)  await maker.toHighlights(args.translateHighlights, args.outputHighlights)
+    if (args.outputImages)      await maker.toImages(args.outputImages)
 
     // Generate final files
     if (args.outputAudio && args.outputVideo) await maker.toAudioAndVideo(args.outputAudio, args.outputVideo, args.outputAudioDescFile)
@@ -131,10 +136,16 @@ function parseArgv() {
     console.log("\t--storyFile=...\t\t\tStory file use to generate video")
     console.log("\t--highlights=...\t\tLoad highlights")
     console.log("\t--highlightsFile=...\t\tLoad highlights from file")
+    console.log("\t--translateHighlights=...\tSet language to translate highlights content")
     console.log("\t--addImageDesc=...\t\tAdd image description")
     console.log("\t--addImageDescFile=...\t\tAdd image description file")
     console.log("\t--addSpeechsDesc=...\t\tAdd speechs description")
     console.log("\t--addSpeechsDescFile=...\tAdd speechs description file")
+    console.log("\t--titleScreenText=...\t\tAdd title screen")
+    console.log(`\t--titleScreenBlur=...\t\tSet blur for title panel (default: ${DEFAULT_OPTIONS.TITLE_BLUR})`)
+    console.log(`\t--titleScreenMargin=...\t\tSet margin for title panel (default: ${DEFAULT_OPTIONS.TITLE_MARGIN})`)
+    console.log(`\t--titleScreenFontSize=...\tSet font size for title (default: ${DEFAULT_OPTIONS.TITLE_FONT_SIZE})`)
+    console.log(`\t--titleScreenFontFamily=...\tSet font family for title (default: ${DEFAULT_OPTIONS.TITLE_FONT_FAMILY})`)
     throw new StopExecution('help')
   }
 

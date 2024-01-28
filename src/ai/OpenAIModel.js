@@ -25,16 +25,23 @@ class OpenAIModel extends ModelAI {
   }
 
   async callImageApi(opts) {
-    const image = await this.model.images.generate({
-      model: opts.model,
-      prompt: `Generate an image of "${opts.prompt}" by complying content policy. Realistic photo, vertical format, portrait orientation, no text`,
-      style: opts.style,
-      size: opts.size,
-      response_format: 'url'
-    })
-
-    return {
-      url: image.data[0].url
+    try {
+      const image = await this.model.images.generate({
+        model: opts.model,
+        prompt: `Imagine and generate an image of "${opts.prompt}". Realistic photo, vertical format, portrait orientation, no text`,
+        style: opts.style,
+        size: opts.size,
+        response_format: 'url'
+      })
+  
+      return {
+        url: image.data[0].url
+      }
+    } catch (e) {
+      if (e && e.code && e.status && e.status === 400 && e.code === 'content_policy_violation') {
+        console.error(`Error to generate image ${opts.id} for "${opts.prompt}" prompt`)
+      }
+      throw e
     }
   }
 

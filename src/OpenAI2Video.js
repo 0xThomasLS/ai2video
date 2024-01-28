@@ -21,7 +21,11 @@ const DEFAULT_OPTIONS = {
   AUDIO_MODEL: 'tts-1',
   IMAGE_STYLE: 'vivid',
   VOICE: 'onyx',
-  BACKGROUND_MUSIC_VOLUME: 0.1
+  BACKGROUND_MUSIC_VOLUME: 0.1,
+  TITLE_BLUR: 10,
+  TITLE_MARGIN: 20,
+  TITLE_FONT_SIZE: 60,
+  TITLE_FONT_FAMILY: 'Ubuntu'
 }
 
 class OpenAI2Video {
@@ -50,6 +54,14 @@ class OpenAI2Video {
       video: {
         width: opts.width,
         height: opts.height
+      },
+      title: {
+        blur: DEFAULT_OPTIONS.TITLE_BLUR,
+        margin: DEFAULT_OPTIONS.TITLE_MARGIN,
+        font: {
+          size: DEFAULT_OPTIONS.TITLE_FONT_SIZE,
+          family: DEFAULT_OPTIONS.TITLE_FONT_FAMILY
+        }
       }
     }
 
@@ -95,10 +107,56 @@ class OpenAI2Video {
     return this.fromHighlights(JSON.parse(highlights))
   }
 
-  addTitleScreen(title) {
-    this.global.title = {
-      text: title
-    }
+  addTitleScreenText(title) {
+    if (this.global.title) this.global.title.text = title
+    return this
+  }
+
+  addTitleScreenBlur(blur) {
+    if (this.global.title) this.global.title.blur = blur
+    return this
+  }
+
+  addTitleScreenMargin(margin) {
+    if (this.global.title) this.global.title.margin = margin
+    return this
+  }
+
+  addTitleScreenFontSize(size) {
+    if (this.global.title && this.global.title.font) this.global.title.font.size = size
+    return this
+  }
+
+  addTitleScreenFontFamily(family) {
+    if (this.global.title && this.global.title.font) this.global.title.font.family = family
+    return this
+  }
+
+  addImagesDescription(json) {
+    this.inputs.images = json
+    this.outputs.images = json
+    return this
+  }
+
+  addImagesDescriptionFile(filePath) {
+    const images = fs.readFileSync(filePath, { encoding: 'utf8'})
+    return this.addImagesDescription(JSON.parse(images))
+  }
+
+  addBackgroundMusicList(list) {
+    this.global.backgroundMusic = list
+    return this
+  }
+
+  addSpeechsDescription(json) {
+    this.inputs.speechs = json
+    this.outputs.speechs = json
+    return this
+  }
+
+  addSpeechsDescriptionFile(filePath) {
+    const speechs = fs.readFileSync(filePath, { encoding: 'utf8'})
+    return this.addSpeechsDescription(JSON.parse(speechs))
   }
 
   async toStory(outputPath) {
@@ -106,7 +164,7 @@ class OpenAI2Video {
     if (!this.inputs) throw new OpenAI2VideoError(0, 'No inputs')
     
     if (this.inputs.search && !this.inputs.story) {
-      this.outputs.story = await this.callOpenAIChatAPI(this.inputs.search)
+      this.outputs.story = await this.callAIChatAPI(this.inputs.search)
     }
 
     if (true === outputPath) console.log(this.outputs.story)
@@ -115,14 +173,14 @@ class OpenAI2Video {
       console.log('Story saved into: ' + outputPath)
     }
 
-    return this.outputs
+    return this
   }
 
   async toHighlights(outputPath) {
     if (!this.outputs || !this.outputs.story) await this.toStory()
 
     console.log('Generate highlights...')
-    const highlights = JSON.parse((await this.callOpenAIChatAPI(`Sans rien modifier à l'histoire, extrait les points d'intérêts (highlight) de l'histoire, ces points d'intérêts serviront à générer les illustrations pour créer les scènes vidéos, tu dois noter ces points d'intérêts au format JSON (tableau JSON) en respectant la structure suivante : \`\`\`{ "highlight": "Point d'intérêt de l'histoire", "prompt": "Prompt DALL-E"}\`\`\`. Le prompt (sans ponctuation) de génération d'image pour l'IA DALL-E, doit avoir le maximum de détail pour conserver les informations des personnages (genre, age...), des lieux... et la trame générale de l'histoire, les images doivent rester cohérente entre elles et doivent être écrite en anglais. Voici un exemple de ce qui est attendu comme objet représentant un point d'intérêt de l'histoire : \`\`\`{"highlight": "Je m'appelle Sarah et j'ai 25 ans. Mon histoire s'est déroulée un soir de juillet 2018, alors que je rentrais en vélo électrique de mon travail, à seulement quelques kilomètres de chez moi. En été, j'ai l'habitude de prendre mon vélo électrique, c'est plus sympa et plus écologique aussi.", "prompt": "Sarah 25 years old cycles home from work"}\`\`\`. A toi de réaliser ce découpage avec l'histoire : "${this.outputs.story}"`)).replace('`', ''))
+    const highlights = JSON.parse((await this.callAIChatAPI(`Sans rien modifier à l'histoire, extrait les points d'intérêts (highlight) de l'histoire, ces points d'intérêts serviront à générer les illustrations pour créer les scènes vidéos, tu dois noter ces points d'intérêts au format JSON (tableau JSON) en respectant la structure suivante : \`\`\`{ "highlight": "Point d'intérêt de l'histoire", "prompt": "Prompt DALL-E"}\`\`\`. Le prompt (sans ponctuation) de génération d'image pour l'IA DALL-E, doit avoir le maximum de détail pour conserver les informations des personnages (genre, age...), des lieux... et la trame générale de l'histoire, les images doivent rester cohérente entre elles et doivent être écrite en anglais. Voici un exemple de ce qui est attendu comme objet représentant un point d'intérêt de l'histoire : \`\`\`{"highlight": "Je m'appelle Sarah et j'ai 25 ans. Mon histoire s'est déroulée un soir de juillet 2018, alors que je rentrais en vélo électrique de mon travail, à seulement quelques kilomètres de chez moi. En été, j'ai l'habitude de prendre mon vélo électrique, c'est plus sympa et plus écologique aussi.", "prompt": "Sarah 25 years old cycles home from work"}\`\`\`. A toi de réaliser ce découpage avec l'histoire : "${this.outputs.story}"`)).replace('`', ''))
 
     if (this.global.title) {
       highlights.unshift({ type: 'title', highlight: this.global.title.text })
@@ -143,76 +201,86 @@ class OpenAI2Video {
       console.log('Highlights description saved into: ' + outputPath)
     }
 
-    return this.outputs
-  }
-
-  addImagesDescription(json) {
-    this.inputs.images = json
-    this.outputs.images = json
     return this
   }
 
-  addImagesDescriptionFile(filePath) {
-    const images = fs.readFileSync(filePath, { encoding: 'utf8'})
-    return this.addImagesDescription(JSON.parse(images))
+  async translateHighlights(language='english', outputPath) {
+    if (!this.outputs || !this.outputs.highlights) await this.toHighlights()
+
+    console.log('Translate highlights...')
+    const highlightsTranslated = await this.callAIChatAPI("Traduis le code JSON en " + language + ".\nSeul la valeur des clés highlight sont à traduire, tout le reste doit être conserver en l\'état, c\'est à dire sans modifier aucunes autres valeurs (pas de modification sur les valeurs de \"type\" et \"prompt\", exemple pour cet objet : " + '```[{"highlight":"Etienne, 30 ans, pilote de course automobile","prompt":"Etienne 30 years old professional race-car driver","type":"normal"}]```, le résultat attendu est uniquement le JSON traduis : ```[{"highlight":"Etienne, 30 years old, racing driver","prompt":"Etienne 30 years old professional race-car driver","type":"normal"}]```). ' + "\nA toi de me répondre avec uniquement la traduction du JSON suivant : ```" + JSON.stringify(this.outputs.highlights) + '```')
+
+    this.outputs.highlights = JSON.parse(highlightsTranslated.replaceAll("\n", '').match(/\[(.*)\]/gi)[0])
+
+    if (outputPath) {
+      fs.writeFileSync(outputPath, JSON.stringify(this.outputs.highlights), { encoding: 'utf8'})
+      console.log('Translation highlights description saved into: ' + outputPath)
+    }
+
+    return this
   }
 
   async toImages(outputPath) {
     if (!this.outputs || !this.outputs.highlights) await this.toHighlights()
+    if (!this.outputs.images) this.outputs.images = []
 
-    console.log('Generate images...')
-    const images = []
-    for (let i=0; i<this.outputs.highlights.length; i++) {
+    const startI = this.outputs.images ? this.outputs.images.length : 0
+    let error = false
+
+    if (startI < this.outputs.highlights.length) console.log('Generate images...')
+
+    for (let i=startI; i<this.outputs.highlights.length; i++) {
       if (this.outputs.highlights[i].type === 'normal') {
         console.log(`Generate image for highlight (${(i+1)}/${this.outputs.highlights.length})...`)
-        images[i] = await this.callOpenAIImageAPI(i+1, this.outputs.highlights[i].prompt)
+        try {
+          const image = await this.callAIImageAPI(i+1, this.outputs.highlights[i].prompt)
+          image.type = this.outputs.highlights[i].type
+          this.outputs.images.push(image)
+        } catch (e) {
+          if (e && e.status && e.code && e.status === 400 && e.code === 'content_policy_violation') {
+            error = e
+            break
+          } else {
+            throw e
+          }
+        }
       }
     }
 
-    console.log('Generate title screen...')
-    if (this.global.title) {
+    // Remove previous title screen image
+    if (this.outputs.images[0].type === 'title') this.outputs.images.shift()
+
+    if (this.outputs.highlights[0].type === 'title' && this.outputs.images.length > 0) {
+      console.log('Generate title screen...')
       const titleOutputPath = path.resolve(this.global.intermadiateFolder + '/title.jpg')
 
       await generateTitleScreen({
-        text: this.global.title.text,
-        backgroundImage: images[1].path,
+        text: this.outputs.highlights[0].highlight,
+        backgroundImage: this.outputs.images[0].path,
         width: this.global.video.width,
         height: this.global.video.height,
         outputPath: titleOutputPath,
-        margin: 20,
+        blur: this.global.title.blur,
+        margin: this.global.title.margin,
         font: {
-          size: 50,
-          family: 'Ubuntu'
+          size: this.global.title.font.size,
+          family: this.global.title.font.family
         }
       })
 
-      images[0] = { path: titleOutputPath }
+      this.outputs.images.unshift({
+        type: 'title',
+        path: titleOutputPath
+      })
     }
-
-    this.outputs.images = images
 
     if (outputPath) {
       fs.writeFileSync(outputPath, JSON.stringify(this.outputs.images), { encoding: 'utf8'})
       console.log('Images description saved into: ' + outputPath)
     }
 
-    return this.outputs
-  }
-
-  addBackgroundMusicList(list) {
-    this.global.backgroundMusic = list
+    if (error) throw e
     return this
-  }
-
-  addSpeechsDescription(json) {
-    this.inputs.speechs = json
-    this.outputs.speechs = json
-    return this
-  }
-
-  addSpeechsDescriptionFile(filePath) {
-    const speechs = fs.readFileSync(filePath, { encoding: 'utf8'})
-    return this.addSpeechsDescription(JSON.parse(speechs))
   }
 
   async toAudio(outputPath, outputDescPath) {
@@ -223,7 +291,7 @@ class OpenAI2Video {
       this.outputs.speechs = []
       for (let i=0; i<this.outputs.highlights.length; i++) {
         console.log(`Generate speech for highlight (${(i+1)}/${this.outputs.highlights.length})...`)
-        this.outputs.speechs[i] = await this.callOpenAIAudioAPI(i+1, this.outputs.highlights[i].highlight + (this.outputs.highlights[i].type === 'title' ? '!' : ''))
+        this.outputs.speechs[i] = await this.callAIAudioAPI(i+1, this.outputs.highlights[i].highlight + (this.outputs.highlights[i].type === 'title' ? '!' : ''))
       }
     }
 
@@ -235,25 +303,29 @@ class OpenAI2Video {
     console.log('Generate audio file...')
     this.outputs.audio = await this.generateAudioFile(outputPath)
 
-    return this.outputs
+    return this
   }
 
   async toVideo(outputPath) {
     if (!this.outputs || !this.outputs.highlights) await this.toHighlights()
-    if (!this.outputs || !this.outputs.images) await this.toImages()
+    if (!this.outputs || !this.outputs.images || this.outputs.images.length != this.outputs.highlights.length) await this.toImages()
 
     // Generate video
     console.log('Generate video...')
     await this.generateVideoFile(outputPath)
     this.outputs.video = outputPath
 
-    return this.outputs
+    return this
   }
 
   async toAudioAndVideo(audioPath, videoPath, outputDescPath) {
     if (!this.outputs || !this.outputs.highlights) await this.toHighlights()
-    if (!this.outputs || !this.outputs.images) await this.toImages()
-    if (!this.outputs || !this.outputs.speechs) await this.toAudio(audioPath, outputDescPath)
+    
+    // Generate Image
+    await this.toImages()
+    
+    // Generate Audio
+    await this.toAudio(audioPath, outputDescPath)
 
     // Generate video
     console.log('Generate video...')
@@ -267,22 +339,23 @@ class OpenAI2Video {
     this.outputs.audio = audioPath
     this.outputs.video = videoPath
 
-    return this.outputs
+    return this
   }
 
-  async callOpenAIChatAPI(prompt) {
+  async callAIChatAPI(prompt) {
     return await this.global.ai.text({ prompt })
   }
 
-  async callOpenAIImageAPI(id, prompt, retry=this.global.retry) {
+  async callAIImageAPI(id, prompt, retry=this.global.retry) {
     try {
       const image = await this.global.ai.image({
+        id: id,
         prompt: `Generate an image of "${prompt}" by complying content policy. Realistic photo, vertical format, portrait orientation, no text`,
         style: this.global.image.style,
         size: `${this.global.video.width}x${this.global.video.height}`,
         response_format: 'url'
       })
-    
+
       // Retrieve image and create temporary file
       const imageBuffer = await createBufferFromUrl(image.url, this.global.retry)
       const imagePath = path.resolve(`${this.global.intermadiateFolder}/img${id}.png`)
@@ -294,14 +367,13 @@ class OpenAI2Video {
       }
     } catch (e) {
       if (retry > 1) {
-        return this.callOpenAIImageAPI(id, prompt, retry-1)
+        return this.callAIImageAPI(id, prompt, retry-1)
       }
-  
       throw e
     }
   }
 
-  async callOpenAIAudioAPI(id, prompt) {
+  async callAIAudioAPI(id, prompt) {
     const mp3 = await this.global.ai.audio({
       voice: this.global.audio.voice,
       prompt: prompt
@@ -322,11 +394,11 @@ class OpenAI2Video {
     console.log('Merge speechs...')
     const speechAudioPath = this.global.intermadiateFolder + '/speech.mp3'
     await concatAudioFile(this.outputs.speechs.map(speech => speech.path), speechAudioPath)
-  
+
     if (this.global.backgroundMusic) {
-      console.log('Merge audio speech and music files...')
       const musicAudioPath = this.global.intermadiateFolder + '/music.mp3'
       await this.createBackgroundMusic(musicAudioPath)
+      console.log('Merge audio speech and music files...')
       await mergeAudioFile(speechAudioPath, musicAudioPath, {
         audio1Volume: 1,
         audio2Volume: this.global.backgroundMusicVolume,
@@ -378,7 +450,7 @@ class OpenAI2Video {
               loop: this.outputs.speechs[id].duration / 1000
             }
             
-            if (highlight.type && highlight.type === 'normal') {
+            if (!highlight.type || highlight.type != 'title') {
               if (filterInverted) image.filters = "zoompan=z='1.5-on/duration*0.5'"
               else image.filters = "zoompan=z='zoom+0.0015'"
               image.filters += `:x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2):d=${fps}*${image.loop}:s=${this.global.video.width}x${this.global.video.height}:fps=${fps}`
@@ -530,7 +602,9 @@ async function generateTitleScreen(opts) {
 
   if (opts.backgroundImage) {
     const background = await loadImage(opts.backgroundImage)
+    ctx.filter = `blur(${opts.blur}px)`
     ctx.drawImage(background, 0, 0, opts.width, opts.height)
+    ctx.filter = 'blur(0px)'
   }
 
   if (opts.text) {
@@ -560,7 +634,7 @@ async function generateTitleScreen(opts) {
 function writeMultiLineCentered(ctx, opts) {
   ctx.font = opts.font.size + 'px ' + opts.font.family
 
-  const maxWidth = opts.width - (2 * opts.margin)
+  const maxWidth = opts.width - (6 * opts.margin)
   const lines = splitText(ctx, opts.text, maxWidth)
   const firstLineY = (opts.height - (lines.length * opts.font.size)) / 2
 
