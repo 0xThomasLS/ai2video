@@ -38,7 +38,8 @@ async function main() {
         audio: args.audioModel,
       },
       image: {
-        style: args.imageStyle
+        style: args.imageStyle,
+        quality: args.imageQuality
       }
     })
 
@@ -67,10 +68,10 @@ async function main() {
     if (args.addSpeechsDescFile)  maker.addSpeechsDescriptionFile(args.addSpeechsDescFile)
 
     // Generate intermadiates files
-    if (args.outputStory)       await maker.toStory(args.outputStory)
-    if (args.outputHighlights)  await maker.toHighlights(args.outputHighlights)
-    if (args.translateHighlights)  await maker.toHighlights(args.translateHighlights, args.outputHighlights)
-    if (args.outputImages)      await maker.toImages(args.outputImages)
+    if (args.outputStory)           await maker.toStory(args.outputStory)
+    if (args.translateHighlights)   await maker.translateHighlights(args.translateHighlights, args.outputHighlights)
+    else if (args.outputHighlights) await maker.toHighlights(args.outputHighlights)
+    if (args.outputImages)          await maker.toImages(args.outputImages)
 
     // Generate final files
     if (args.outputAudio && args.outputVideo) await maker.toAudioAndVideo(args.outputAudio, args.outputVideo, args.outputAudioDescFile)
@@ -79,7 +80,6 @@ async function main() {
 
     console.log('Finished!')
   } catch (e) {
-    console.error(e)
     if (!e instanceof StopExecution) {
       console.error(e)
     }
@@ -117,19 +117,19 @@ function parseArgv() {
     console.log(`\t--intermadiate=...\t\t\Intermadiate folder for intermediate generation (default: ${DEFAULT_OPTIONS.INTERMADIATE_FOLDER})`)
     console.log(`\t--retry=...\t\t\tNumber of retry (default: ${DEFAULT_OPTIONS.RETRY}) when error occured`)
     console.log(`\t--aspect=...\t\t\tVideo aspect output (square, vertical, horizontal, default: ${DEFAULT_OPTIONS.VIDEO_ASPECT})`)
-    console.log("\t--outputStory=...\t\tStory output path")
-    console.log("\t--outputHighlights=...\t\tHighlights description file path")
-    console.log("\t--outputImages=...\t\tImages description file path")
-    console.log(`\t--outputVideo=...\t\tVideo output path (default: ${defaultArgs.outputVideo})`)
-    console.log(`\t--outputAudio=...\t\tAudio output path (default: ${defaultArgs.outputAudio})`)
-    console.log("\t--outputAudioDescFile=...\tAudio description file path")
-    console.log(`\t--chatModel=...\t\t\tOpenAI model (default: ${DEFAULT_OPTIONS.CHAT_MODEL}) used for chat (rewrite story, highlight...)`)
-    console.log(`\t--imageModel=...\t\tOpenAI model (default: ${DEFAULT_OPTIONS.IMAGE_MODEL}) used for generate image`)
-    console.log(`\t--imageStyle=...\t\tOpenAI style (default: ${DEFAULT_OPTIONS.IMAGE_STYLE}, only for dall-e-3 model) used for generate image`)
-    console.log(`\t--audioModel=...\t\tOpenAI model (default: ${DEFAULT_OPTIONS.AUDIO_MODEL}) used for generate speech`)
-    console.log(`\t--voice=...\t\t\tVoice (default: ${DEFAULT_OPTIONS.VOICE}) used for generate speech`)
     console.log("\t--backgroundMusic=...\t\tPath or Array of path for background music")
     console.log(`\t--backgroundMusicVolume=...\tVolume of background music (float between 0 to 1, default: ${DEFAULT_OPTIONS.BACKGROUND_MUSIC_VOLUME})`)
+    console.log("\t--titleScreenText=...\t\tAdd title screen")
+    console.log(`\t--titleScreenBlur=...\t\tSet blur for title panel (default: ${DEFAULT_OPTIONS.TITLE_BLUR})`)
+    console.log(`\t--titleScreenMargin=...\t\tSet margin for title panel (default: ${DEFAULT_OPTIONS.TITLE_MARGIN})`)
+    console.log(`\t--titleScreenFontSize=...\tSet font size for title (default: ${DEFAULT_OPTIONS.TITLE_FONT_SIZE})`)
+    console.log(`\t--titleScreenFontFamily=...\tSet font family for title (default: ${DEFAULT_OPTIONS.TITLE_FONT_FAMILY})`)
+    console.log(`\t--chatModel=...\t\t\tOpenAI model (default: ${DEFAULT_OPTIONS.CHAT_MODEL}) used for chat (rewrite story, highlight...)`)
+    console.log(`\t--imageModel=...\t\tImage generation AI model (default: ${DEFAULT_OPTIONS.IMAGE_MODEL})`)
+    console.log(`\t--imageStyle=...\t\tImage generation style (default: ${DEFAULT_OPTIONS.IMAGE_STYLE}, only for dall-e-3 model)`)
+    console.log(`\t--imageQuality=...\t\tImage generation quality (default: ${DEFAULT_OPTIONS.IMAGE_QUALITY})`)
+    console.log(`\t--audioModel=...\t\tOpenAI model (default: ${DEFAULT_OPTIONS.AUDIO_MODEL}) used for generate speech`)
+    console.log(`\t--voice=...\t\t\tVoice (default: ${DEFAULT_OPTIONS.VOICE}) used for generate speech`)
     console.log("\t--search=...\t\t\tAsk GPT to generate the base story use to generate video")
     console.log("\t--searchFile=...\t\tFilepath to generate new search")
     console.log("\t--story=...\t\t\tStory use to generate video")
@@ -141,11 +141,12 @@ function parseArgv() {
     console.log("\t--addImageDescFile=...\t\tAdd image description file")
     console.log("\t--addSpeechsDesc=...\t\tAdd speechs description")
     console.log("\t--addSpeechsDescFile=...\tAdd speechs description file")
-    console.log("\t--titleScreenText=...\t\tAdd title screen")
-    console.log(`\t--titleScreenBlur=...\t\tSet blur for title panel (default: ${DEFAULT_OPTIONS.TITLE_BLUR})`)
-    console.log(`\t--titleScreenMargin=...\t\tSet margin for title panel (default: ${DEFAULT_OPTIONS.TITLE_MARGIN})`)
-    console.log(`\t--titleScreenFontSize=...\tSet font size for title (default: ${DEFAULT_OPTIONS.TITLE_FONT_SIZE})`)
-    console.log(`\t--titleScreenFontFamily=...\tSet font family for title (default: ${DEFAULT_OPTIONS.TITLE_FONT_FAMILY})`)
+    console.log("\t--outputStory=...\t\tStory output path")
+    console.log("\t--outputHighlights=...\t\tHighlights description file path")
+    console.log("\t--outputImages=...\t\tImages description file path")
+    console.log(`\t--outputVideo=...\t\tVideo output path (default: ${defaultArgs.outputVideo})`)
+    console.log(`\t--outputAudio=...\t\tAudio output path (default: ${defaultArgs.outputAudio})`)
+    console.log("\t--outputAudioDescFile=...\tAudio description file path")
     throw new StopExecution('help')
   }
 

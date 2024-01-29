@@ -31,7 +31,8 @@ class OpenAIModel extends ModelAI {
         prompt: `Imagine and generate an image of "${opts.prompt}". Realistic photo, vertical format, portrait orientation, no text`,
         style: opts.style,
         size: opts.size,
-        response_format: 'url'
+        response_format: 'url',
+        quality: opts.quality
       })
   
       return {

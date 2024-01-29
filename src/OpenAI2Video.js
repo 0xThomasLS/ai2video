@@ -16,16 +16,17 @@ const DEFAULT_OPTIONS = {
   VIDEO_ASPECT: 'square',
   RETRY: 3,
   INTERMADIATE_FOLDER: './tmp',
-  CHAT_MODEL: 'gpt-4',
-  IMAGE_MODEL: 'dall-e-3',
-  AUDIO_MODEL: 'tts-1',
-  IMAGE_STYLE: 'vivid',
-  VOICE: 'onyx',
   BACKGROUND_MUSIC_VOLUME: 0.1,
   TITLE_BLUR: 10,
   TITLE_MARGIN: 20,
   TITLE_FONT_SIZE: 60,
-  TITLE_FONT_FAMILY: 'Ubuntu'
+  TITLE_FONT_FAMILY: 'Ubuntu',
+  CHAT_MODEL: 'gpt-4',
+  IMAGE_MODEL: 'dall-e-3',
+  IMAGE_STYLE: 'vivid',
+  IMAGE_QUALITY: 'hd',
+  AUDIO_MODEL: 'tts-1',
+  VOICE: 'onyx'
 }
 
 class OpenAI2Video {
@@ -46,7 +47,8 @@ class OpenAI2Video {
       backgroundMusic: opts.backgroundMusic,
       backgroundMusicVolume: opts.backgroundMusicVolume ? opts.backgroundMusicVolume : DEFAULT_OPTIONS.BACKGROUND_MUSIC_VOLUME,
       image: {
-        style: opts.image && opts.image.style ? opts.image.style : DEFAULT_OPTIONS.IMAGE_STYLE
+        style: opts.image && opts.image.style ? opts.image.style : DEFAULT_OPTIONS.IMAGE_STYLE,
+        quality: opts.image && opts.image.quality ? opts.image.quality : DEFAULT_OPTIONS.IMAGE_QUALITY
       },
       audio: {
         voice: opts.voice ? opts.voice : DEFAULT_OPTIONS.VOICE
@@ -176,6 +178,22 @@ class OpenAI2Video {
     return this
   }
 
+  async translateHighlights(language='english', outputPath) {
+    if (!this.outputs || !this.outputs.highlights) await this.toHighlights(outputPath)
+
+    console.log('Translate highlights...')
+    const highlightsTranslated = await this.callAIChatAPI("Traduis le code JSON en " + language + ".\nSeul la valeur des clés highlight sont à traduire, tout le reste doit être conserver en l\'état, c\'est à dire sans modifier aucunes autres valeurs (pas de modification sur les valeurs de \"type\" et \"prompt\", exemple pour cet objet : " + '```[{"highlight":"Etienne, 30 ans, pilote de course automobile","prompt":"Etienne 30 years old professional race-car driver","type":"normal"}]```, le résultat attendu est uniquement le JSON traduis : ```[{"highlight":"Etienne, 30 years old, racing driver","prompt":"Etienne 30 years old professional race-car driver","type":"normal"}]```). ' + "\nA toi de me répondre avec uniquement la traduction du JSON suivant : ```" + JSON.stringify(this.outputs.highlights) + '```')
+
+    this.outputs.highlights = JSON.parse(highlightsTranslated.replaceAll("\n", '').match(/\[(.*)\]/gi)[0])
+
+    if (outputPath) {
+      fs.writeFileSync(outputPath, JSON.stringify(this.outputs.highlights), { encoding: 'utf8'})
+      console.log('Translation highlights description saved into: ' + outputPath)
+    }
+
+    return this
+  }
+
   async toHighlights(outputPath) {
     if (!this.outputs || !this.outputs.story) await this.toStory()
 
@@ -199,22 +217,6 @@ class OpenAI2Video {
     if (outputPath) {
       fs.writeFileSync(outputPath, JSON.stringify(this.outputs.highlights), { encoding: 'utf8'})
       console.log('Highlights description saved into: ' + outputPath)
-    }
-
-    return this
-  }
-
-  async translateHighlights(language='english', outputPath) {
-    if (!this.outputs || !this.outputs.highlights) await this.toHighlights()
-
-    console.log('Translate highlights...')
-    const highlightsTranslated = await this.callAIChatAPI("Traduis le code JSON en " + language + ".\nSeul la valeur des clés highlight sont à traduire, tout le reste doit être conserver en l\'état, c\'est à dire sans modifier aucunes autres valeurs (pas de modification sur les valeurs de \"type\" et \"prompt\", exemple pour cet objet : " + '```[{"highlight":"Etienne, 30 ans, pilote de course automobile","prompt":"Etienne 30 years old professional race-car driver","type":"normal"}]```, le résultat attendu est uniquement le JSON traduis : ```[{"highlight":"Etienne, 30 years old, racing driver","prompt":"Etienne 30 years old professional race-car driver","type":"normal"}]```). ' + "\nA toi de me répondre avec uniquement la traduction du JSON suivant : ```" + JSON.stringify(this.outputs.highlights) + '```')
-
-    this.outputs.highlights = JSON.parse(highlightsTranslated.replaceAll("\n", '').match(/\[(.*)\]/gi)[0])
-
-    if (outputPath) {
-      fs.writeFileSync(outputPath, JSON.stringify(this.outputs.highlights), { encoding: 'utf8'})
-      console.log('Translation highlights description saved into: ' + outputPath)
     }
 
     return this
@@ -279,7 +281,7 @@ class OpenAI2Video {
       console.log('Images description saved into: ' + outputPath)
     }
 
-    if (error) throw e
+    if (error) throw error
     return this
   }
 
@@ -353,7 +355,8 @@ class OpenAI2Video {
         prompt: `Generate an image of "${prompt}" by complying content policy. Realistic photo, vertical format, portrait orientation, no text`,
         style: this.global.image.style,
         size: `${this.global.video.width}x${this.global.video.height}`,
-        response_format: 'url'
+        response_format: 'url',
+        quality: this.global.image.quality
       })
 
       // Retrieve image and create temporary file
