@@ -244,15 +244,19 @@ class OpenAI2Video {
           image.type = this.outputs.highlights[i].type
           this.outputs.images.push(image)
         } catch (e) {
-          throw e
+          if (e && e.status === 400 && e.code === '') {
+            error = e
+          } else {
+            throw e
+          }
         }
       }
     }
 
     // Remove previous title screen image
-    if (this.outputs.images[0].type === 'title') this.outputs.images.shift()
+    if (!error && this.outputs.images[0].type === 'title') this.outputs.images.shift()
 
-    if (this.outputs.highlights[0].type === 'title' && this.outputs.images.length > 0) {
+    if (!error && this.outputs.highlights[0].type === 'title' && this.outputs.images.length > 0) {
       console.log('Generate title screen...')
       const titleOutputPath = path.resolve(this.global.intermadiateFolder + '/title.jpg')
 
@@ -276,11 +280,12 @@ class OpenAI2Video {
       })
     }
 
-    if (outputPath) {
+    if (outputPath && this.outputs.images.length > 0) {
       fs.writeFileSync(outputPath, JSON.stringify(this.outputs.images), { encoding: 'utf8'})
       console.log('Images description saved into: ' + outputPath)
     }
 
+    if (error) throw error
     return this
   }
 
