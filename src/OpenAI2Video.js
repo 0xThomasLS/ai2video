@@ -75,6 +75,11 @@ class OpenAI2Video {
       this.global.video.height = 1024
       if (this.global.ai.opts.models.image === 'dall-e-3' && this.global.aspect === 'vertical') this.global.video.height = 1792
     }
+
+    // Check intermadiate folder exist
+    if (!fs.existsSync(this.global.intermadiateFolder)) {
+      fs.mkdirSync(this.global.intermadiateFolder)
+    }
   }
 
   fromSearch(prompt) {
