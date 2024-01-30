@@ -80,7 +80,7 @@ async function main() {
 
     console.log('Finished!')
   } catch (e) {
-    if (!e instanceof StopExecution) {
+    if (!(e instanceof StopExecution)) {
       console.error(e)
     }
   }

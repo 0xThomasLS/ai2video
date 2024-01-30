@@ -239,12 +239,7 @@ class OpenAI2Video {
           image.type = this.outputs.highlights[i].type
           this.outputs.images.push(image)
         } catch (e) {
-          if (e && e.status && e.code && e.status === 400 && e.code === 'content_policy_violation') {
-            error = e
-            break
-          } else {
-            throw e
-          }
+          throw e
         }
       }
     }
@@ -281,7 +276,6 @@ class OpenAI2Video {
       console.log('Images description saved into: ' + outputPath)
     }
 
-    if (error) throw error
     return this
   }
 
@@ -381,12 +375,12 @@ class OpenAI2Video {
       voice: this.global.audio.voice,
       prompt: prompt
     })
-  
+    
     // Retrieve and create speech mp3
     const buffer = Buffer.from(await mp3.arrayBuffer())
     const speechPath = path.resolve(`${this.global.intermadiateFolder}/speech${id}.mp3`)
     fs.writeFileSync(speechPath, buffer)
-  
+    
     return {
       path: speechPath,
       duration: getMP3Duration(buffer)
