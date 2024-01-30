@@ -16,6 +16,7 @@ const DEFAULT_OPTIONS = {
   VIDEO_ASPECT: 'square',
   RETRY: 3,
   INTERMADIATE_FOLDER: './tmp',
+  LANGUAGE: 'english',
   BACKGROUND_MUSIC_VOLUME: 0.1,
   TITLE_BLUR: 10,
   TITLE_MARGIN: 20,
@@ -44,6 +45,7 @@ class OpenAI2Video {
       aspect: opts.aspect ? opts.aspect : DEFAULT_OPTIONS.VIDEO_ASPECT,
       retry: opts.retry ? opts.retry : DEFAULT_OPTIONS.RETRY,
       intermadiateFolder: opts.intermadiateFolder ? opts.intermadiateFolder : DEFAULT_OPTIONS.INTERMADIATE_FOLDER,
+      lang: opts.lang ? opts.lang : DEFAULT_OPTIONS.LANGUAGE,
       backgroundMusic: opts.backgroundMusic,
       backgroundMusicVolume: opts.backgroundMusicVolume ? opts.backgroundMusicVolume : DEFAULT_OPTIONS.BACKGROUND_MUSIC_VOLUME,
       image: {
@@ -203,7 +205,7 @@ class OpenAI2Video {
     if (!this.outputs || !this.outputs.story) await this.toStory()
 
     console.log('Generate highlights...')
-    const highlights = JSON.parse((await this.callAIChatAPI(`Sans rien modifier à l'histoire, extrait les points d'intérêts (highlight) de l'histoire, ces points d'intérêts serviront à générer les illustrations pour créer les scènes vidéos, tu dois noter ces points d'intérêts au format JSON (tableau JSON) en respectant la structure suivante : \`\`\`{ "highlight": "Point d'intérêt de l'histoire", "prompt": "Prompt DALL-E"}\`\`\`. Le prompt (sans ponctuation) de génération d'image pour l'IA DALL-E, doit avoir le maximum de détail pour conserver les informations des personnages (genre, age...), des lieux... et la trame générale de l'histoire, les images doivent rester cohérente entre elles et doivent être écrite en anglais. Voici un exemple de ce qui est attendu comme objet représentant un point d'intérêt de l'histoire : \`\`\`{"highlight": "Je m'appelle Sarah et j'ai 25 ans. Mon histoire s'est déroulée un soir de juillet 2018, alors que je rentrais en vélo électrique de mon travail, à seulement quelques kilomètres de chez moi. En été, j'ai l'habitude de prendre mon vélo électrique, c'est plus sympa et plus écologique aussi.", "prompt": "Sarah 25 years old cycles home from work"}\`\`\`. A toi de réaliser ce découpage avec l'histoire : "${this.outputs.story}"`)).replace('`', ''))
+    const highlights = JSON.parse((await this.callAIChatAPI(`Sans rien modifier à l'histoire, extrait les points d'intérêts (highlight) de l'histoire en ${this.global.lang}, ces points d'intérêts serviront à générer les illustrations pour créer les scènes vidéos, tu dois noter ces points d'intérêts au format JSON (tableau JSON) en respectant la structure suivante : \`\`\`{ "highlight": "Point d'intérêt de l'histoire", "prompt": "Prompt DALL-E"}\`\`\`. Le prompt (sans ponctuation) de génération d'image pour l'IA DALL-E, doit avoir le maximum de détail pour conserver les informations des personnages (genre, age...), des lieux... et la trame générale de l'histoire, les images doivent rester cohérente entre elles et doivent être écrite en anglais. Voici un exemple de ce qui est attendu comme objet représentant un point d'intérêt de l'histoire : \`\`\`{"highlight": "Je m'appelle Sarah et j'ai 25 ans. Mon histoire s'est déroulée un soir de juillet 2018, alors que je rentrais en vélo électrique de mon travail, à seulement quelques kilomètres de chez moi. En été, j'ai l'habitude de prendre mon vélo électrique, c'est plus sympa et plus écologique aussi.", "prompt": "Sarah 25 years old cycles home from work"}\`\`\`. A toi de réaliser ce découpage avec l'histoire : "${this.outputs.story}"`)).replace('`', ''))
 
     if (this.global.title) {
       highlights.unshift({ type: 'title', highlight: this.global.title.text })

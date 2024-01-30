@@ -30,6 +30,7 @@ async function main() {
       aspect: args.aspect,
       retry: args.retry,
       intermadiateFolder: args.intermadiate,
+      lang: args.lang,
       backgroundMusicVolume: args.backgroundMusicVolume,
       voice: args.voice,
       models: {
@@ -115,6 +116,7 @@ function parseArgv() {
     console.log("\t--help\t\t\t\tOpen documentation for this node script")
     console.log("\t--apiKey=...\t\t\tOpenAI API key")
     console.log(`\t--intermadiate=...\t\t\Intermadiate folder for intermediate generation (default: ${DEFAULT_OPTIONS.INTERMADIATE_FOLDER})`)
+    console.log(`\t--lang=...\t\t\tDefine default language (default: ${DEFAULT_OPTIONS.LANGUAGE})`)
     console.log(`\t--retry=...\t\t\tNumber of retry (default: ${DEFAULT_OPTIONS.RETRY}) when error occured`)
     console.log(`\t--aspect=...\t\t\tVideo aspect output (square, vertical, horizontal, default: ${DEFAULT_OPTIONS.VIDEO_ASPECT})`)
     console.log("\t--backgroundMusic=...\t\tPath or Array of path for background music")
